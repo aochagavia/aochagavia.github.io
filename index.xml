@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>aochagavia&#39;s blog</title>
+    <link>https://aochagavia.github.io/index.xml</link>
+    <description>Recent content on aochagavia&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 09 Dec 2016 14:14:51 +0100</lastBuildDate>
+    <atom:link href="https://aochagavia.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>About</title>
+      <link>https://aochagavia.github.io/about/</link>
+      <pubDate>Fri, 09 Dec 2016 14:14:51 +0100</pubDate>
+      
+      <guid>https://aochagavia.github.io/about/</guid>
+      <description>&lt;p&gt;I am a Computer Science student. I&amp;rsquo;m mostly interested in programming languages, compilers and distributed systems. As a student, I have some free time to contribute regularly to Rust, a new open source systems programming language with a fantastic community.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Hello Hugo!</title>
+      <link>https://aochagavia.github.io/blog/hello-hugo/</link>
+      <pubDate>Fri, 09 Dec 2016 14:14:51 +0100</pubDate>
+      
+      <guid>https://aochagavia.github.io/blog/hello-hugo/</guid>
+      <description>&lt;p&gt;A couple of months ago I shut down my old blog about programming. Although it
+sounds cruel to kill a blog, the truth is that it had only one or two articles
+of dubious quality.&lt;/p&gt;
+
+&lt;p&gt;However, I think there will be interesting things to write about in the coming
+months, so here I am with a new blog. After a couple of hours of tinkering
+with different themes and settings, this is ready to go online! There will
+be no pretexts the next time I want to write&amp;hellip; The only obstacle now is
+finding time and a good topic, so stay tuned.&lt;/p&gt;
+
+&lt;p&gt;As a fun fact, I am using Hugo to generate the website. The fact that it has
+a single binary and no dependencies seems very convenient (this is not
+entirely true though, since I am using &lt;code&gt;pygments&lt;/code&gt; for syntax highlighting).&lt;/p&gt;
+
+&lt;p&gt;Anyway, now everything is in place and this post will make the blog feel
+less empty until there is real content.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
