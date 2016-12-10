@@ -6,8 +6,156 @@
     <description>Recent content in Blog-rsses on aochagavia&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Fri, 09 Dec 2016 14:14:51 +0100</lastBuildDate>
+    <lastBuildDate>Sat, 10 Dec 2016 14:14:51 +0100</lastBuildDate>
     <atom:link href="https://aochagavia.github.io/blog/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Enforcing drop order in Rust</title>
+      <link>https://aochagavia.github.io/blog/enforcing-drop-order-in-rust/</link>
+      <pubDate>Sat, 10 Dec 2016 14:14:51 +0100</pubDate>
+      
+      <guid>https://aochagavia.github.io/blog/enforcing-drop-order-in-rust/</guid>
+      <description>
+
+&lt;p&gt;Some days ago I stumbled upon an old &lt;a href=&#34;https://github.com/rust-lang/rfcs/issues/744&#34;&gt;issue&lt;/a&gt; on Rust&amp;rsquo;s GitHub
+repository. While the title of the issue is &lt;em&gt;&amp;ldquo;should struct fields and array
+elements be dropped in reverse declaration order (a la C++)&amp;rdquo;&lt;/em&gt;, the discussion
+also extends to whether the current drop order should be stabilized.&lt;/p&gt;
+
+&lt;p&gt;Surprising as it may seem, drop order in Rust is unspecified and could
+theoretically be changed in the future. However, there are use cases that
+require enforcing a given drop order (see, for instance, &lt;a href=&#34;http://stackoverflow.com/questions/41053542/forcing-the-order-in-which-struct-fields-are-dropped&#34;&gt;this SO
+question&lt;/a&gt;).&lt;/p&gt;
+
+&lt;p&gt;In the current version of Rust (1.13), as well as in the nightlies, there is no
+mechanism to statically control the drop order of the fields of a struct.
+This leaves a programmer with two options:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Wrapping fields in an &lt;code&gt;Option&lt;/code&gt;-like enum.&lt;/li&gt;
+&lt;li&gt;Relying on the current (unspecified) drop order.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;This post will explore how both alternatives can be used. By experimenting
+with a simple problem, we will try to explain the advantages and disadvantages
+of both approaches. At the end, we will also share some final thoughts on
+stabilizing drop order.&lt;/p&gt;
+
+&lt;h2 id=&#34;formulating-the-problem&#34;&gt;Formulating the problem&lt;/h2&gt;
+
+&lt;p&gt;Before defining the problem, we need a way to monitor the drop order of
+struct fields. Here, we define a struct that prints a string. It will
+be used in the code examples that are to follow.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #75715e&#34;&gt;// A struct that prints the contained `str` upon being dropped&lt;/span&gt;
+&lt;span style=&#34;color: #66d9ef&#34;&gt;struct&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;&amp;#39;static &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;str&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;);&lt;/span&gt;
+
+&lt;span style=&#34;color: #66d9ef&#34;&gt;impl&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Drop &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;for&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; drop(&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;mut&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; self) {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        println&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;!&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;Dropping {}&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;, self.&lt;/span&gt;&lt;span style=&#34;color: #ae81ff&#34;&gt;0&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;)&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    }&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;With that out of the way, here is a minimal problem to consider. Suppose you
+have the following struct, and would like &lt;code&gt;baz&lt;/code&gt; to be dropped before &lt;code&gt;bar&lt;/code&gt;.
+If you fail to do so, Something Bad will happen.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;struct&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    bar&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    baz&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;h2 id=&#34;alternative-one-wrapping-fields-in-an-option-like-enum&#34;&gt;Alternative one: wrapping fields in an &lt;code&gt;Option&lt;/code&gt;-like enum&lt;/h2&gt;
+
+&lt;p&gt;Wrapping your fields is pretty straightforward if you have seen the pattern
+before. For the sake of simplicity, we just use an &lt;code&gt;Option&lt;/code&gt;, though it would
+be possible to write your own enum to make things a bit more ergonomic.&lt;/p&gt;
+
+&lt;p&gt;After introducing an &lt;code&gt;Option&lt;/code&gt;, the struct looks like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;struct&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    bar&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    baz&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Option&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;PrintDrop&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;gt;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;With this new struct, you can write a &lt;code&gt;Drop&lt;/code&gt; implementation that takes the
+value out of the &lt;code&gt;Option&lt;/code&gt; and drops it:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;impl&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Drop &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;for&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; drop(&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;mut&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; self) {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        &lt;/span&gt;&lt;span style=&#34;color: #75715e&#34;&gt;// Drop baz by replacing it&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        self.baz &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; None;&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    }&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;You can test the code by running it in a program with the following main
+function:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; foo &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        bar&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;bar&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        baz&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Some(PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;baz&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;)),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    };&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;The output below shows that &lt;code&gt;baz&lt;/code&gt; is dropped first and &lt;code&gt;bar&lt;/code&gt; second, which
+was exactly our intention!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping baz
+Dropping bar
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;alternative-two-relying-on-the-current-unspecified-drop-order&#34;&gt;Alternative two: relying on the current (unspecified) drop order&lt;/h2&gt;
+
+&lt;p&gt;Of course, it is also possible to find out in which order the fields are
+dropped in the current version of Rust! It turns out that the fields are
+dropped in the same order as they are declared.&lt;/p&gt;
+
+&lt;p&gt;In the case of &lt;code&gt;Foo&lt;/code&gt;, this means that flipping the declaration of &lt;code&gt;baz&lt;/code&gt; and
+&lt;code&gt;bar&lt;/code&gt; is exactly what we need:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;struct&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    baz&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    bar&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;After this change, we can verify that everything works correctly by running
+the code with a main function similar to our previous one. In fact, we get
+the following output:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping baz
+Dropping bar
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;which-one-should-you-use&#34;&gt;Which one should you use?&lt;/h2&gt;
+
+&lt;p&gt;In my opinion, the wrapper type is the Right Way To Go &amp;trade;, just because
+you are not supposed to rely on unspecified behavior. The disadvantage of the latter approach seems
+clear: a future version of the compiler implementing a different drop order
+would break your program. This becomes even worse if you are authoring a
+library, since a program that relies on it could potentially break just by
+using a new version of the compiler. Even if you published a fix, it would
+require &lt;em&gt;everyone&lt;/em&gt; to update their dependencies.&lt;/p&gt;
+
+&lt;p&gt;On the other hand, it is undeniable that the wrapper approach has disadvantages
+as well:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;It is clearly less ergonomic, because you can no longer use a normal type.&lt;/li&gt;
+&lt;li&gt;Each time you access the field you need to unwrap it, which means an extra
+branch in your code unless the optimizer is smart enough.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;final-thoughts&#34;&gt;Final thoughts&lt;/h2&gt;
+
+&lt;p&gt;Given the drawbacks of having to use a runtime construct to enforce
+a certain drop order, it would make sense to stabilize it. While there is
+clearly consensus about the need for stabilization, it is not at all clear
+whether the currently implemented drop order should be changed before it is
+stabilized. The discussion is still open, as summarized by nrc in a &lt;a href=&#34;https://github.com/rust-lang/rfcs/issues/744#issuecomment-231237499&#34;&gt;comment&lt;/a&gt;
+on Rust&amp;rsquo;s issue tracker.&lt;/p&gt;
+</description>
+    </item>
     
     <item>
       <title>Hello Hugo!</title>
