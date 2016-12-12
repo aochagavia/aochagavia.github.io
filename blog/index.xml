@@ -6,8 +6,265 @@
     <description>Recent content in Blog-rsses on aochagavia&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sat, 10 Dec 2016 14:14:51 +0100</lastBuildDate>
+    <lastBuildDate>Mon, 12 Dec 2016 14:14:51 +0100</lastBuildDate>
     <atom:link href="https://aochagavia.github.io/blog/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Exploring Rust&#39;s unspecified drop order</title>
+      <link>https://aochagavia.github.io/blog/exploring-rusts-unspecified-drop-order/</link>
+      <pubDate>Mon, 12 Dec 2016 14:14:51 +0100</pubDate>
+      
+      <guid>https://aochagavia.github.io/blog/exploring-rusts-unspecified-drop-order/</guid>
+      <description>
+
+&lt;p&gt;After my previous &lt;a href=&#34;https://aochagavia.github.io/blog/enforcing-drop-order-in-rust/&#34;&gt;post&lt;/a&gt;, I thought it would be
+interesting to run some experiments to determine the unspecified drop order
+within different constructs of Rust. After you read this, I guarantee you will
+understand why there is so much &lt;a href=&#34;https://github.com/rust-lang/rfcs/issues/744&#34;&gt;discussion&lt;/a&gt; about changing
+the current drop order before stabilizing it :)&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;TLDR:&lt;/strong&gt; the current drop order is really weird!&lt;/p&gt;
+
+&lt;p&gt;In this post we are going to look at:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Local variables&lt;/li&gt;
+&lt;li&gt;Tuples&lt;/li&gt;
+&lt;li&gt;Structs and enums&lt;/li&gt;
+&lt;li&gt;Slices&lt;/li&gt;
+&lt;li&gt;Closure captures&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;We will be reusing the &lt;code&gt;PrintDrop&lt;/code&gt; struct, so here is the definition
+in case you forgot it:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;struct&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;&amp;#39;static &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;str&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;);&lt;/span&gt;
+
+&lt;span style=&#34;color: #66d9ef&#34;&gt;impl&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Drop &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;for&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; drop(&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;mut&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; self) {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        println&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;!&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;Dropping {}&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;, self.&lt;/span&gt;&lt;span style=&#34;color: #ae81ff&#34;&gt;0&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;)&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    }&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;Now we are ready to go!&lt;/p&gt;
+
+&lt;h2 id=&#34;local-variables&#34;&gt;Local variables&lt;/h2&gt;
+
+&lt;p&gt;Let&amp;rsquo;s start with the following piece of code, testing the drop order of local
+variables:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; x &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;);&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; y &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;);&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;And the output is&amp;hellip;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping y
+Dropping x
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;As you can see, local variables are dropped in the reverse order of their
+declaration. This should come as no surprise, since new objects can store
+references to previously declared ones. Therefore a different drop
+order would result in dangling pointers.&lt;/p&gt;
+
+&lt;p&gt;The drop order of function parameters is similar, so the first parameter
+in the list is the last one to be dropped. The code is omitted for the sake
+of brevity, but this behavior can be trivially reproduced by writing a
+function with two by-value parameters.&lt;/p&gt;
+
+&lt;p&gt;If you think about drop order from the perspective of data structures, the
+behavior of local variables resembles the way a stack works. You
+could say that they are pushed onto the stack and popped at the
+end of the scope.&lt;/p&gt;
+
+&lt;h2 id=&#34;tuples&#34;&gt;Tuples&lt;/h2&gt;
+
+&lt;p&gt;After seeing the stack-like behavior of local variables, one would expect to
+see something similar in other constructs. However, tuples have a little
+surprise for us&amp;hellip;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; tup &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; (PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;z&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;));&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;And the output is&amp;hellip;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping x
+Dropping y
+Dropping z
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Wait! Are you telling me that the variables are dropped in the same order as
+they are declared? So it seems! To continue with the data structures story,
+we could say that tuples behave like a queue, in which elements are enqueued
+in their order of appearance and dequeued at the end of the scope.&lt;/p&gt;
+
+&lt;p&gt;But this is not all! There is a subtle surprise lurking around
+the corner&amp;hellip; If there is a &lt;code&gt;panic&lt;/code&gt; during construction of the tuple, the drop
+order is reversed! If you don&amp;rsquo;t believe me, just run the code below:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; tup &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; (PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), panic&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;!&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;());&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;As I told you, the output is:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping y
+Dropping x
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In other words, a tuple shows a queue-like drop order, unless one of the
+expressions in the tuple constructor panics. In case
+of a panic during construction, the drop order will be stack-like!&lt;/p&gt;
+
+&lt;h2 id=&#34;structs-and-enums&#34;&gt;Structs and enums&lt;/h2&gt;
+
+&lt;p&gt;Structs present the same weird behavior as tuples. To a certain
+extent this seems consistent, since a struct is arguably a tuple with named
+fields instead of indices.
+It seems logical that they share the same drop order. The same holds for enums.&lt;/p&gt;
+
+&lt;p&gt;For the sake of brevity, the code below only tests the drop order of a struct.
+Of course, the same behavior is expected from tuple structs, tuple enum
+variants and struct enum variants.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;struct&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    x&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    y&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    z&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop,&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+
+&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; foo &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        x&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        y&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        z&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;z&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    };&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;And the output is&amp;hellip;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping x
+Dropping y
+Dropping z
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Again, the order is reversed when a panic occurs during construction:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; foo &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; Foo {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        x&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        y&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        z&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;:&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; panic&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;!&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;(),&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    };&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;As can be observed in the output below:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping y
+Dropping x
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Looking at things from the bright side, at least we can say that this weird
+behavior is consistent across all data types. Still, it feels completely
+arbitrary to change the drop order when a panic occurs. This makes code that
+relies on a certain drop order needlessly complex.&lt;/p&gt;
+
+&lt;h2 id=&#34;slices&#34;&gt;Slices&lt;/h2&gt;
+
+&lt;p&gt;Slices show the same queue-like behavior under normal circumstances and a
+stack-like behavior in the presence of a panic during construction.&lt;/p&gt;
+
+&lt;p&gt;Panic-free construction:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; xs &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; [PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;z&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;)];&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;Results in queue-like drop order:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping x
+Dropping y
+Dropping z
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Panic during construction:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; xs &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; [PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;), panic&lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;!&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;()];&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;Results in stack-like drop order:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping y
+Dropping x
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Interestingly, &lt;code&gt;Vec&amp;lt;T&amp;gt;&lt;/code&gt; shows the same drop order. As we are used to, a panic
+in the &lt;code&gt;vec![]&lt;/code&gt; macro will reverse the drop order. However, if you
+panic after constructing the &lt;code&gt;Vec&lt;/code&gt; by manually calling &lt;code&gt;push&lt;/code&gt; a couple of
+times, the drop order will be queue-like (from Rust&amp;rsquo;s perspective
+you are dropping a fully constructed &lt;code&gt;Vec&lt;/code&gt;).&lt;/p&gt;
+
+&lt;h2 id=&#34;closure-captures&#34;&gt;Closure captures&lt;/h2&gt;
+
+&lt;p&gt;An intriguing construct to &lt;em&gt;close&lt;/em&gt; this post is the case of &lt;em&gt;closure&lt;/em&gt; captures.
+We know that, under the hood, closures are actually structs that implement
+the &lt;code&gt;Fn&lt;/code&gt;, &lt;code&gt;FnMut&lt;/code&gt; or &lt;code&gt;FnOnce&lt;/code&gt; traits. This means that the drop order depends
+on the order in which captures are declared in the generated struct.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s start with a simple code example. Note that the order in which the
+variables are declared is different than the order in which they are used
+in the closure.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;fn&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; main() {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; z &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;z&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;);&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; x &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;x&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;);&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; y &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; PrintDrop(&lt;/span&gt;&lt;span style=&#34;color: #e6db74&#34;&gt;&amp;quot;y&amp;quot;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;);&lt;/span&gt;
+
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; closure &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; move &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;||&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        x; y; z;&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    };&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;}&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;And the output is&amp;hellip;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping x
+Dropping y
+Dropping z
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Based on the output it seems that the drop order is the same as the order in
+which the variables appear in the closure. However, we should test what
+happens in the scenario below:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34; style=&#34;background: #272822&#34;&gt;&lt;pre style=&#34;line-height: 125%&#34;&gt;&lt;span&gt;&lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; closure &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; move &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;||&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    {&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;        &lt;/span&gt;&lt;span style=&#34;color: #66d9ef&#34;&gt;let&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; z_ref &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt; &lt;/span&gt;&lt;span style=&#34;color: #f92672&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color: #f8f8f2&#34;&gt;z;&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    }&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;    x; y; z;&lt;/span&gt;
+&lt;span style=&#34;color: #f8f8f2&#34;&gt;};&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+&lt;p&gt;Again, the output is:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;Dropping x
+Dropping y
+Dropping z
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;As you can see, even though &lt;code&gt;z&lt;/code&gt; appears first as a reference, it is still the
+last one to be dropped. Therefore we should reformulate our hypothesis and say
+that the order in which captures are dropped is the same as the order in which
+they are moved. This way we ignore any references that may appear before.&lt;/p&gt;
+
+&lt;p&gt;Of course, we could perform more experiments to see if there are any edge
+cases to be aware about, but in the end the best approach would be to look at
+the source code of the compiler. This will certainly be necessary when drop
+order is stabilized.&lt;/p&gt;
+</description>
+    </item>
     
     <item>
       <title>Enforcing drop order in Rust</title>
