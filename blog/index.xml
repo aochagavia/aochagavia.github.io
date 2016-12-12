@@ -236,6 +236,10 @@ Dropping x
 expressions in the tuple constructor panics. In case
 of a panic during construction, the drop order will be stack-like!&lt;/p&gt;
 
+&lt;p&gt;&lt;strong&gt;EDIT:&lt;/strong&gt; as pointed out by &lt;a href=&#34;https://www.reddit.com/r/rust/comments/5hw00k/exploring_rusts_unspecified_drop_order/db3ejx0/&#34;&gt;birkenfeld&lt;/a&gt; on Reddit, the stack-like
+drop order actually makes sense in case of a panic. There is at this stage no tuple!
+Therefore, the expressions are dropped according to the rules of local variables.&lt;/p&gt;
+
 &lt;h2 id=&#34;structs-and-enums&#34;&gt;Structs and enums&lt;/h2&gt;
 
 &lt;p&gt;Structs present the same weird behavior as tuples. To a certain
@@ -284,10 +288,9 @@ Dropping z
 Dropping x
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;Looking at things from the bright side, at least we can say that this weird
+&lt;p&gt;Looking at things from the bright side, at least we can say that this
 behavior is consistent across all data types. Still, it feels completely
-arbitrary to change the drop order when a panic occurs. This makes code that
-relies on a certain drop order needlessly complex.&lt;/p&gt;
+arbitrary to use a queue-like drop order.&lt;/p&gt;
 
 &lt;h2 id=&#34;slices&#34;&gt;Slices&lt;/h2&gt;
 
