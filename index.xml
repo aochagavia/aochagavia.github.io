@@ -6,8 +6,148 @@
     <description>Recent content on aochagavia&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 04 Jul 2017 15:14:51 +0100</lastBuildDate>
+    <lastBuildDate>Thu, 02 Nov 2017 15:14:51 +0100</lastBuildDate>
     <atom:link href="https://aochagavia.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Singularity AI</title>
+      <link>https://aochagavia.github.io/blog/singularity-ai/</link>
+      <pubDate>Thu, 02 Nov 2017 15:14:51 +0100</pubDate>
+      
+      <guid>https://aochagavia.github.io/blog/singularity-ai/</guid>
+      <description>
+
+&lt;p&gt;Sometimes you read comments on the internet about how computers are going to
+take over the world when &lt;a href=&#34;https://en.wikipedia.org/wiki/Artificial_general_intelligence&#34;&gt;Artificial General Intelligence&lt;/a&gt; becomes a thing.
+While I am convinced a real AGI will never happen, it inspired me to start a
+new project: &lt;a href=&#34;https://singularity-ai.neocities.org/&#34;&gt;Singularity AI&lt;/a&gt;. The title sounds like a startup name,
+but it is basically a tool to prank people by making them think I programmed
+an AGI.&lt;/p&gt;
+
+&lt;h3 id=&#34;the-idea&#34;&gt;The idea&lt;/h3&gt;
+
+&lt;p&gt;Singularity AI consists of a single-page website where you can ask questions
+and get answers from the computer. The website itself pretends to be an AGI,
+as you can deduce from the first question of the FAQ:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;What are you?&lt;/p&gt;
+
+&lt;p&gt;I am a General Artificial Intelligence, that is, a computer program that can think and feel just as you do.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h3 id=&#34;designing-a-fake-agi&#34;&gt;Designing a fake AGI&lt;/h3&gt;
+
+&lt;p&gt;Singularity AI is meant to be used by two people. One of them knows that everything is fake
+and secretly types the answers to every question. The other one, the subject of the prank,
+suggests new questions and looks astonished at the screen after receiving the right answers
+to each question. Sounds great, right?&lt;/p&gt;
+
+&lt;p&gt;A big question remains, though. How can we type the answers without anyone noticing?
+Fortunately, we are talking about an AGI here. That is, a computer that is indistinguishable
+from a human being. It happens that this computer is very proud and won&amp;rsquo;t answer to any
+question, unless asked in the right way. Therefore, each time after you type a question,
+you also need to type a petition in the following form:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Oh Singularity, please answer my humble question&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;This may seem silly, but it is the key to entering answers in a subtle way. Since the
+petition text is always the same, you could modify the text input to show the same
+sentence regardless of what you type. In other words, you can write the answer and have
+the website display the sentence: &lt;em&gt;Oh Singularity, please answer my humble question&lt;/em&gt;.&lt;/p&gt;
+
+&lt;p&gt;By the way, I didn&amp;rsquo;t bother to get the website working on mobile, since you always
+get typing suggestions from your keyboard and it is much easier to commit mistakes.
+This makes it almost impossible to type the answers without being noticed.&lt;/p&gt;
+
+&lt;p&gt;One last detail is that, sometimes, the person being pranked wants to type the question
+themselves. After all, it seems so extraordinary that they feel the need to do it,
+to ensure it is no prank. Fortunately, in this case they will get a generic answer about the computer
+being upset with them because they doubt the website is real.&lt;/p&gt;
+
+&lt;h3 id=&#34;how-to-use&#34;&gt;How to use&lt;/h3&gt;
+
+&lt;p&gt;If you go to the &lt;a href=&#34;https://singularity-ai.neocities.org/&#34;&gt;website&lt;/a&gt; right now, you will notice that the text input for
+the petition behaves like a normal text input. That is, it shows the letters you type,
+whatever they are, instead of showing the &amp;ldquo;&lt;em&gt;Oh Singularity&amp;hellip;&lt;/em&gt;&amp;rdquo; sentence.&lt;/p&gt;
+
+&lt;p&gt;In order to start entering the answer, you need to get into &lt;em&gt;answering mode&lt;/em&gt;. You can
+do this by pressing &lt;code&gt;;&lt;/code&gt; on the petition text input. From that point on, you can type any
+gibberish you want and will see how the &amp;ldquo;&lt;em&gt;Oh Singularity&amp;hellip;&lt;/em&gt;&amp;rdquo; sentence starts appearing
+on the screen. When you are finished writing the answer, you can type &lt;code&gt;;&lt;/code&gt; again to exit
+&lt;em&gt;answering mode&lt;/em&gt; and finish writing the petition sentence.&lt;/p&gt;
+
+&lt;p&gt;After writing the question and the petition, you can click on the &lt;em&gt;Ask&lt;/em&gt; button to reveal
+the answer.&lt;/p&gt;
+
+&lt;h3 id=&#34;the-implementation&#34;&gt;The implementation&lt;/h3&gt;
+
+&lt;p&gt;Since I don&amp;rsquo;t want to pay for publishing such a ridiculous website, I decided to
+implement it in HTML and Javascript. That way, I could host it at &lt;a href=&#34;https://neocities.org&#34;&gt;neocities&lt;/a&gt;
+for free. I programmed it in vanilla Javascript, as anything beyond that would have been
+overkill (besides, I really didn&amp;rsquo;t want to setup a &amp;ldquo;modern Javascript toolchain&amp;rdquo; with Webpack
+and all the bells and whistles.)&lt;/p&gt;
+
+&lt;p&gt;It took me about an hour to build a basic prototype. I tested it on some friends and was
+satisfied with the results, so I went ahead, grabbed a bootstrap template and published
+the resulting &lt;a href=&#34;https://singularity-ai.neocities.org/&#34;&gt;website&lt;/a&gt;. While I don&amp;rsquo;t like adding a bunch of unnecessary CSS and
+Javascript, the time savings of not having to come up with my own design are certainly
+worth it.&lt;/p&gt;
+
+&lt;p&gt;The Javascript code spans about 80 lines. I am not particularly proud of the style,
+since I almost didn&amp;rsquo;t touch it after I got it working. I am usually much pickier about
+the quality of the code I publish, but on the other hand, this project is more
+about the website and less about the code. You are welcome to look at it, but
+it is really nothing special and probably a unreadable.&lt;/p&gt;
+
+&lt;h3 id=&#34;user-testing&#34;&gt;User testing&lt;/h3&gt;
+
+&lt;p&gt;The real fun begins at this point, when the website is published and ready to
+be shown to a couple of friends. Some of them were very skeptical and refused
+to believe this was a real AGI, so from the beginning they were trying to find
+out how I typed the answers. Some of them, however, were more willing to believe,
+leading to interesting stories like the one below.&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;Me: ever heard of an Artificial General Intelligence? Look, I programmed one. It
+can answer any question you have. It makes use of all the sensors on the computer,
+but can also query information from the internet.&lt;/p&gt;
+
+&lt;p&gt;Friend: that can&amp;rsquo;t be true. Ask it this: how cold is my beer?&lt;/p&gt;
+
+&lt;p&gt;(He probably thought this would be a good question, since I cannot think of a sensible way my
+computer could know the temperature of his beer)&lt;/p&gt;
+
+&lt;p&gt;Computer: 12 degrees.&lt;/p&gt;
+
+&lt;p&gt;Friend (stands up and starts walking around the room): WHAT!? WHAT!?&lt;/p&gt;
+
+&lt;p&gt;(He kept asking questions, usually easy to answer, each time reacting in the same way.
+He also tried typing the questions himself, which of course resulted in snarky
+pre-programmed answers. Finally, he came up with a truly difficult
+question&amp;hellip;)&lt;/p&gt;
+
+&lt;p&gt;Friend (with a confident smile): ask it how much I weigh.&lt;/p&gt;
+
+&lt;p&gt;(At this point, I considered whether I would get away with a generic answer.
+On the other hand, I felt tempted to take the gamble and come up with an
+estimation&amp;hellip; It would be truly amazing if I managed to get the right answer&amp;hellip;)&lt;/p&gt;
+
+&lt;p&gt;Computer: 62 kilograms.&lt;/p&gt;
+
+&lt;p&gt;(At this point my friend finally came to the conclusion that everything was fake,
+quite late in the game&amp;hellip; I lost the gamble)&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h3 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h3&gt;
+
+&lt;p&gt;As you can see, you can have quite a bit of fun with this. Feel free to share your
+experience. You can find my email by cloning this blog&amp;rsquo;s repository and using &lt;code&gt;git log&lt;/code&gt;.
+Maybe we can even create a hall of fame with the best stories.&lt;/p&gt;
+</description>
+    </item>
     
     <item>
       <title>RFC 1857 stabilizing Rust&#39;s drop order has been accepted!</title>
