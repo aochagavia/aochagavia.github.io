@@ -273,6 +273,10 @@ lot of potential. I am impressed by the fact that I was able to port Rocket
 with almost no modifications to the game logic code. In the end, I ended up
 spending most of the time dealing with rendering and figuring out how to correctly
 set up the integration between Javascript and Rust.&lt;/p&gt;
+
+&lt;h1 id=&#34;discussion&#34;&gt;Discussion&lt;/h1&gt;
+
+&lt;p&gt;Comment on &lt;a href=&#34;https://www.reddit.com/r/rust/comments/7ha3gj/rocket_a_rust_game_running_on_wasm/&#34;&gt;reddit&lt;/a&gt; or &lt;a href=&#34;https://news.ycombinator.com/item?id=15843064&#34;&gt;HN&lt;/a&gt;!&lt;/p&gt;
 </description>
     </item>
     
