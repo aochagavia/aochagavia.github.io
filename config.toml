@@ -13,8 +13,8 @@ blog = "blog/:slug/"
 
 [Params]
 author = "Aochagavia's Blog"
-dateform = "January 02, 2006"
+dateform = "Jan 02, 2006"
 dateformfull = "January 02, 2006"
 description = "Just another programming blog"
 github = "//github.com/aochagavia"
-linkedin = "//nl.linkedin.com/in/adolfoochagavia"
+linkedin = "//www.linkedin.com/in/adolfoochagavia/"
